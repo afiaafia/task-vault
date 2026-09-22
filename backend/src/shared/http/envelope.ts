@@ -1,12 +1,4 @@
-export interface ApiSuccess<T> {
-  success: true;
-  data: T;
-}
-
-export interface ApiError {
-  success: false;
+export interface FieldError {
+  field: string;
   message: string;
-  requestId?: string;
 }
-
-export type ApiResponse<T> = ApiSuccess<T> | ApiError;

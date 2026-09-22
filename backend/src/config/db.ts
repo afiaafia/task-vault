@@ -1,9 +1,11 @@
 import mongoose from 'mongoose';
 import { env } from '@config/env.js';
+import { service_name } from '@shared/identity.js';
 import { logger } from '@utils/logger.js';
 
 export const connectDb = async (): Promise<void> => {
   await mongoose.connect(env.MONGODB_URI, {
+    appName: service_name,
     maxPoolSize: env.NODE_ENV === 'production' ? 100 : 10,
     minPoolSize: env.NODE_ENV === 'production' ? 5 : 0,
     maxIdleTimeMS: 30_000,
