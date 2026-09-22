@@ -1,32 +1,84 @@
 import type { Server } from 'node:http';
-import { logger } from './logger.js';
+import type { AddressInfo } from 'node:net';
 
-export const listenServer = (server: Server, port: number): Promise<void> =>
-  new Promise((resolve, reject) => {
-    const onError = (error: Error) => {
-      server.off('listening', onListening);
-      reject(error);
+const idle_sweep_interval = 100;
+
+type ServerErrorHandler = (err: Error) => void;
+
+export const listenServer = (
+  httpServer: Server,
+  port: number,
+  onRunTimeError?: ServerErrorHandler
+): Promise<AddressInfo> =>
+  new Promise<AddressInfo>((resolve, reject) => {
+    const detachStartupListeners = (): void => {
+      httpServer.off('error', onBindError);
+      httpServer.off('listening', onListening);
     };
 
-    const onListening = () => {
-      server.off('error', onError);
-      resolve();
+    const onBindError = (err: Error): void => {
+      detachStartupListeners();
+      reject(err);
     };
 
-    server.once('error', onError);
-    server.once('listening', onListening);
-    server.listen(port);
-  });
+    const onListening = (): void => {
+      const address = httpServer.address();
 
-export const closeServer = (server: Server): Promise<void> =>
-  new Promise((resolve, reject) => {
-    server.close((error) => {
-      if (error) {
-        reject(error);
+      if (address === null || typeof address === 'string') {
+        const error = new Error(
+          `expected a tcp address after binding port ${port}`
+        );
+
+        detachStartupListeners();
+
+        if (!httpServer.listening) {
+          reject(error);
+          return;
+        }
+
+        try {
+          httpServer.close(() => reject(error));
+        } catch {
+          reject(error);
+        }
+
         return;
       }
 
-      logger.info('HTTP server closed');
-      resolve();
-    });
+      if (onRunTimeError) {
+        httpServer.on('error', onRunTimeError);
+      }
+
+      detachStartupListeners();
+      resolve(address);
+    };
+
+    httpServer.on('error', onBindError);
+    httpServer.on('listening', onListening);
+
+    try {
+      httpServer.listen(port);
+    } catch (err) {
+      detachStartupListeners();
+      reject(err);
+    }
   });
+
+export const closeServer = async (httpServer: Server): Promise<boolean> => {
+  if (!httpServer.listening) return false;
+
+  const idleSweeper = setInterval(() => {
+    httpServer.closeIdleConnections();
+  }, idle_sweep_interval);
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      httpServer.close((err) => (err ? reject(err) : resolve()));
+      httpServer.closeIdleConnections();
+    });
+  } finally {
+    clearInterval(idleSweeper);
+  }
+
+  return true;
+};
