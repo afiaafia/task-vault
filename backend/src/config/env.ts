@@ -1,10 +1,26 @@
-import { envSchema } from './env/schema.js';
+import { z } from 'zod';
+import { envSchema } from '@config/env/schema.js';
 
-const parsedEnv = envSchema.safeParse(process.env);
+const parsed = envSchema.safeParse(process.env);
 
-if (!parsedEnv.success) {
-  console.error('Invalid environment variables:', parsedEnv.error.format());
+if (!parsed.success) {
+  console.error('invalid environment variables', z.treeifyError(parsed.error));
   process.exit(1);
 }
 
-export const env = parsedEnv.data;
+const data = parsed.data;
+
+type ParsedEnv = z.infer<typeof envSchema>;
+
+export type Env = Readonly<
+  ParsedEnv & {
+    readonly isDevelopment: boolean;
+    readonly isProduction: boolean;
+  }
+>;
+
+export const env: Env = Object.freeze({
+  ...data,
+  isDevelopment: data.NODE_ENV === 'development',
+  isProduction: data.NODE_ENV === 'production',
+});
