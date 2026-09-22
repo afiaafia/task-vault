@@ -3,7 +3,7 @@ import { env } from '@config/env.js';
 import { logger } from '@utils/logger.js';
 
 export const connectDb = async (): Promise<void> => {
-  await mongoose.connect(env.MONGODB_URI, {
+  await mongoose.connect(env.MONGO_URI, {
     maxPoolSize: env.NODE_ENV === 'production' ? 100 : 10,
     minPoolSize: env.NODE_ENV === 'production' ? 5 : 0,
     maxIdleTimeMS: 30_000,
