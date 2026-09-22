@@ -7,7 +7,7 @@ export const errorMiddleware: ErrorRequestHandler = (
   res,
   _next
 ) => {
-  logger.error(error);
+  logger.error({ error }, 'Unhandled request error');
 
   res.status(500).json({
     success: false,
